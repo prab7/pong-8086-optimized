@@ -1,10 +1,11 @@
-this is the next iteration of code 
-
 .model small
 .stack 64h
 .186
 
 .data
+    ; (320x200 = 64000 bytes)    
+    double_buffer db 320*200 dup(0) ; Double buffer
+    
     ball_x dw 0Ah      ; y_pos init
     ball_y dw 0Ah      ; x_pos init
     ball_size dw 10   
@@ -13,28 +14,32 @@ this is the next iteration of code
     prev_ballx dw 1 dup(?)
     prev_bally dw 1 dup(?)
     color db 0bh      ; color
-    
+
 
 .code
-.startup
+.startup ; init DS, point to data seg
 
     mov ax, 13h ;set video mode: 320x200 256 colors 
     int 10h
 
-    call clear_screen
+    mov ax, 0A000h  ;init ES, point to video memory
+    mov es, ax
+
+    call clear_buffer
+    ; call copy_to_screen
 
 main_loop:
+    call clear_ball      ; Clear previous ball in buffer
+    call draw_ball       ; Draw new ball in buffer
+    call copy_to_screen  ; Update screen
 
-    call clear_ball     ;clear previous ball
-    call draw_ball      ;draw new ball
-
-    ; update the previous position
+    ; Update previous position
     mov ax, ball_x
-    mov prev_ballx,ax
+    mov prev_ballx, ax
     mov ax, ball_y
-    mov prev_bally,ax
+    mov prev_bally, ax
 
-    ; update ball position
+    ; Update ball position
     mov ax, ball_dx
     add ball_x, ax
     mov ax, ball_dy
@@ -42,58 +47,85 @@ main_loop:
 
     call check_collisions
 
-    call delay      ;Artificial delay
-    
-    mov ah, 01h       ;wait for a key press
+    ; Delay and check for keypress
+    call delay
+    mov ah, 01h
     int 16h
-    jz main_loop      ;continue if no key pressed
+    jz main_loop
 
-    ; Exit the program
-    mov ax, 03h       ; Set text mode (mode 03h)
+    ; Exit to text mode
+    mov ax, 03h
     int 10h
 
     .exit
 
 
-clear_screen:
-    mov ax, 0A000h    ; Video memory segment
+clear_buffer:
+    push es
+    mov ax, ds          ; Point ES to our data segment
     mov es, ax
-    xor di, di        
-    mov cx, 320*200   
-    xor al, al        ;color: black
-    rep stosb         ;fill video memory with black
+    mov di, offset double_buffer
+    mov cx, 320*200
+    xor ax, ax
+    rep stosb
+    pop es
+    ret
+
+copy_to_screen:
+    push ds
+    push es
+    
+    ; mov ax, @data       ; Set source to our buffer
+    ; mov ds, ax
+    mov si, offset double_buffer
+
+    ; mov ax, 0A000h      ; Set destination to video memory
+    ; mov es, ax
+    xor di, di
+
+    mov cx, 320*200
+    rep movsb
+
+    pop es
+    pop ds
     ret
 
 
 draw_ball:
-    mov ax, 0A000h    
+    push es
+    mov ax, ds          ; Point ES to our data segment (where double_buffer is)
     mov es, ax
     mov bx, ball_y    
     mov ax, 320
     mul bx
     add ax, ball_x    
+    add ax, offset double_buffer  ; Add buffer offset
     mov di, ax        
 
     mov cx, ball_size 
+    mov al, color
 
     draw_ball_row:
         push cx
         mov cx, ball_size  
-        mov al, color      
         rep stosb          
         add di, 320        
         sub di, ball_size  
         pop cx
         loop draw_ball_row
-        ret
+    
+    pop es
+    ret
 
 clear_ball:
-    mov ax, 0A000h    
+    push es
+    mov ax, ds          ; Point ES to our data segment (where double_buffer is)
     mov es, ax
     mov bx, prev_bally
     mov ax, 320
     mul bx
     add ax, prev_ballx
+    add ax, offset double_buffer  ; Add buffer offset
     mov di, ax
     
     mov cx, ball_size
@@ -118,14 +150,16 @@ clear_ball:
         sub di, ball_size   ; set pointer at start location
         pop cx
         loop clear_row
-        ret
+    
+    pop es
+    ret
 
-        write_black:
-            xor al,al           ;if !(prev_ballx == ball_x AND prev_bally == ball_y)
-            mov es:[di],al
-            inc di
-            loop clear_pixel
-            jmp next_jump       ;jump back to exit/loop properly
+    write_black:
+        xor al,al           ;if !(prev_ballx == ball_x AND prev_bally == ball_y)
+        mov es:[di],al
+        inc di
+        loop clear_pixel
+        jmp next_jump       ;jump back to exit/loop properly
 
 
 check_collisions: 
@@ -153,10 +187,10 @@ check_collisions:
         ret
 
 delay:
-    mov cx, 01h       ;delay counter (adjust for speed)
+    mov cx, 01h       ; delay counter (adjust for speed)
     delay_loop:
         push cx
-        mov cx, 0FFFFh
+        mov cx, 05000h  ; adjust for speed
     inner_delay:
         loop inner_delay
         pop cx
