@@ -32,26 +32,30 @@ Mode 13h characteristics:
 
 ### BIOS int10h pixel writes v/s direct video memory writes
 
+https://github.com/user-attachments/assets/f66f41c2-e192-459c-85f0-3e437bb022d4  https://github.com/user-attachments/assets/73bbe22a-811c-49e3-9cdf-d41a07dfdcda
+
 ### without double buffer (flickering) v/s with double buffer
+
+https://github.com/user-attachments/assets/ebc6cd0e-6f09-4c5c-84d2-a824d1af6127  https://github.com/user-attachments/assets/08019858-8f8b-4a79-ace0-ae113a2f89c0
 
 ## Key Optimizations and Techniques:
 
 ### 1. Double Buffering
-```x86
+```assembly
 double_buffer db 320*200 dup(0)  ; Allocates space for entire screen
 ```
 - Eliminates screen flickering by drawing to an off-screen buffer first
 - **Optimization**: Complete frame is prepared in memory before being copied to video RAM
 
 ### 2. Direct Video Memory Access
-```x86
+```assembly
 mov ax, 0A000h  ; Video memory segment (0A000:0000)
 mov es, ax      ; Set ES to point to video memory
 ```
 - Direct memory writes to video memory are significantly faster thatn BIOS calls like INT 10h pixel drawing
 
 ### 3. Efficient Buffer Clearing
-```x86
+```assembly
 clear_buffer:
     mov di, offset double_buffer
     mov cx, 320*200
@@ -62,7 +66,7 @@ clear_buffer:
 - Could be optimized further by using `rep stosw` (but I avoided it for now for the sake of consistency)
 
 ### 4. Drawing the Ball
-```x86
+```assembly
 draw_ball:
     ; Calculate position in buffer: y*320 + x
     mov bx, ball_y    
@@ -88,7 +92,7 @@ draw_ball:
   - Uses string operations `rep stosb` for horizontal lines
 
 ### 5. Efficient Ball Erasing
-```x86
+```assembly
 clear_ball:
     ;boring alignment code
     mov cx, ball_size
@@ -120,7 +124,7 @@ clear_ball:
 - much faster then clearing the whole screen/ball each frame
 
 ### 6. Fast Screen Update
-```x86
+```assembly
 copy_to_screen:
     mov si, offset double_buffer  ; Source
     xor di, di                   ; Destination (0A000:0000)
@@ -136,7 +140,7 @@ copy_to_screen:
 ## Build & Run
 
 Assembled with MASM611, (other assemblers may also work)
-```x86
+```assembly
 ml pong.asm
 pong
 ```
