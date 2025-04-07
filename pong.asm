@@ -1,4 +1,3 @@
-this is the next iteration of code 
 
 .model small
 .stack 64h
@@ -13,6 +12,7 @@ this is the next iteration of code
     prev_ballx dw 1 dup(?)
     prev_bally dw 1 dup(?)
     color db 0bh      ; color
+    time_aux db 0     ; track of time
     
 
 .code
@@ -22,17 +22,27 @@ this is the next iteration of code
     int 10h
 
     call clear_screen
-
 main_loop:
+    mov ah,01h ;wait for a key press
+    int 16h
+    jnz exit
 
-    call clear_ball     ;clear previous ball
-    call draw_ball      ;draw new ball
+    mov ah,2ch ;get system time
+    int 21h
 
+    cmp dl,time_aux
+    JE main_loop
+    mov time_aux,dl ;update time
+    
+
+    call clear_ball  ;clear previous ball
+    call draw_ball  ;draw new ball
+    
     ; update the previous position
     mov ax, ball_x
-    mov prev_ballx,ax
+    mov prev_ballx, ax
     mov ax, ball_y
-    mov prev_bally,ax
+    mov prev_bally, ax
 
     ; update ball position
     mov ax, ball_dx
@@ -42,16 +52,11 @@ main_loop:
 
     call check_collisions
 
-    call delay      ;Artificial delay
-    
-    mov ah, 01h       ;wait for a key press
-    int 16h
-    jz main_loop      ;continue if no key pressed
+    jmp main_loop
 
-    ; Exit the program
-    mov ax, 03h       ; Set text mode (mode 03h)
+    exit:
+    mov ax, 03h       ;set text mode
     int 10h
-
     .exit
 
 
@@ -152,15 +157,15 @@ check_collisions:
         neg ball_dy       ;reverse y
         ret
 
-delay:
-    mov cx, 01h       ;delay counter (adjust for speed)
-    delay_loop:
-        push cx
-        mov cx, 0FFFFh
-    inner_delay:
-        loop inner_delay
-        pop cx
-        loop delay_loop
-        ret
+; delay:
+;     mov cx, 01h       ;delay counter (adjust for speed)
+;     delay_loop:
+;         push cx
+;         mov cx, 0FFFFh
+;     inner_delay:
+;         loop inner_delay
+;         pop cx
+;         loop delay_loop
+;         ret
 
 end
