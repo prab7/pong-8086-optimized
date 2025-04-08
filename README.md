@@ -4,10 +4,10 @@ A Simple, optimized Pong screensaver implementation for 8086 architecture, emula
 
 ## Features
 
-- Double buffered graphics
+- Static Double buffer
 - Optimized ball rendering
 - Direct video memory access
-- Efficient collision detection
+- Wall collision detection
 
 ## Controls
 
@@ -32,11 +32,15 @@ Mode 13h characteristics:
 
 ### BIOS int10h pixel writes v/s direct video memory writes
 
-https://github.com/user-attachments/assets/f66f41c2-e192-459c-85f0-3e437bb022d4  https://github.com/user-attachments/assets/73bbe22a-811c-49e3-9cdf-d41a07dfdcda
+https://github.com/user-attachments/assets/f66f41c2-e192-459c-85f0-3e437bb022d4
+
+https://github.com/user-attachments/assets/73bbe22a-811c-49e3-9cdf-d41a07dfdcda
 
 ### without double buffer (flickering) v/s with double buffer
 
-https://github.com/user-attachments/assets/ebc6cd0e-6f09-4c5c-84d2-a824d1af6127  https://github.com/user-attachments/assets/08019858-8f8b-4a79-ace0-ae113a2f89c0
+https://github.com/user-attachments/assets/ebc6cd0e-6f09-4c5c-84d2-a824d1af6127
+
+https://github.com/user-attachments/assets/08019858-8f8b-4a79-ace0-ae113a2f89c0
 
 ## Key Optimizations and Techniques:
 
@@ -45,7 +49,16 @@ https://github.com/user-attachments/assets/ebc6cd0e-6f09-4c5c-84d2-a824d1af6127 
 double_buffer db 320*200 dup(0)  ; Allocates space for entire screen
 ```
 - Eliminates screen flickering by drawing to an off-screen buffer first
-- **Optimization**: Complete frame is prepared in memory before being copied to video RAM
+- Complete frame is prepared in memory before being copied to video RAM
+
+```assembly
+copy_to_screen:
+    mov si, offset double_buffer  ; Source
+    xor di, di                   ; Destination (0A000:0000)
+    mov cx, 320*200              ; Entire screen
+    rep movsb                    ; Bulk copy
+```
+- Copies entire frame in one operation with `rep movsb`
 
 ### 2. Direct Video Memory Access
 ```assembly
@@ -65,7 +78,7 @@ clear_buffer:
 - Uses `rep stosb` to clear the entire buffer in one operation
 - Could be optimized further by using `rep stosw` (but I avoided it for now for the sake of consistency)
 
-### 4. Drawing the Ball
+### 4. Drawing Ball
 ```assembly
 draw_ball:
     ; Calculate position in buffer: y*320 + x
@@ -91,7 +104,7 @@ draw_ball:
   - Pre-calculates all positions before drawing
   - Uses string operations `rep stosb` for horizontal lines
 
-### 5. Efficient Ball Erasing
+### 5. Clearing Ball
 ```assembly
 clear_ball:
     ;boring alignment code
@@ -120,29 +133,20 @@ clear_ball:
 
     ;boring wrapping up code
 ```
-- **Optimization**: Only erases non-overlapping previous ball pixels after each frame
+- **"Dirty-Rectangle Optimization"**: Only erases non-overlapping previous ball pixels after each frame
 - much faster then clearing the whole screen/ball each frame
 
-### 6. Fast Screen Update
-```assembly
-copy_to_screen:
-    mov si, offset double_buffer  ; Source
-    xor di, di                   ; Destination (0A000:0000)
-    mov cx, 320*200              ; Entire screen
-    rep movsb                    ; Bulk copy
-```
-- **Optimization**: Copies entire frame in one operation with `rep movsb`
-
-### 8. Additional optimizations
+### 6. Additional optimizations
 
 - Use of `xor al, al` instead of `mov al, 0` to clear registers whenever necessary
 
 ## Build & Run
 
 Assembled with MASM611, (other assemblers may also work)
+emulated on DOSBOX
 ```assembly
 ml pong.asm
-pong
+pong.exe
 ```
 
 ## Future Improvements
@@ -150,3 +154,4 @@ pong
 - **Frame rate control**
     - as of now, I am only able to acheive smooth animation using a double delay loop.
     - Unsuccessful to implement using system time, very glitchy.
+- additional game logic, advanced controls
